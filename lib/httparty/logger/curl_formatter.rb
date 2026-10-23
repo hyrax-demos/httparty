@@ -41,7 +41,7 @@ module HTTParty
       def log_response
         log IN, "HTTP/#{response.http_version} #{response.code}"
         log_response_headers
-        log IN, "\n#{response.body}"
+        log IN, "\n#{utf8_safe(response.body)}"
         log IN
       end
 
@@ -82,7 +82,24 @@ module HTTParty
       end
 
       def log(direction, line = '')
-        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{line}"
+        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{utf8_safe(line)}"
+      end
+
+      # The log lines are joined into a single String, which raises
+      # Encoding::CompatibilityError when a line holding non-ASCII bytes in
+      # one encoding (e.g. a binary ASCII-8BIT body) meets a non-ASCII line
+      # in another. Returns the text as UTF-8, with U+FFFD in place of any
+      # bytes or characters that cannot be converted; a UTF-8 String is
+      # returned as is.
+      def utf8_safe(text)
+        text = text.to_s
+        return text if text.encoding == Encoding::UTF_8
+
+        if text.encoding == Encoding::BINARY
+          text.dup.force_encoding(Encoding::UTF_8).scrub
+        else
+          text.encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "\uFFFD")
+        end
       end
 
       def current_time
