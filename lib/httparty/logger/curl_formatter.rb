@@ -90,7 +90,8 @@ module HTTParty
       # one encoding (e.g. a binary ASCII-8BIT body) meets a non-ASCII line
       # in another. Returns the text as UTF-8, with U+FFFD in place of any
       # bytes or characters that cannot be converted; a UTF-8 String is
-      # returned as is.
+      # returned as is. When Ruby has no converter for the encoding (e.g. the
+      # dummy encoding UTF-7), the bytes are read as UTF-8 and scrubbed.
       def utf8_safe(text)
         text = text.to_s
         return text if text.encoding == Encoding::UTF_8
@@ -100,6 +101,8 @@ module HTTParty
         else
           text.encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "\uFFFD")
         end
+      rescue Encoding::ConverterNotFoundError
+        text.dup.force_encoding(Encoding::UTF_8).scrub
       end
 
       def current_time

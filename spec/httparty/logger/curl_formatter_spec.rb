@@ -151,6 +151,20 @@ RSpec.describe HTTParty::Logger::CurlFormatter do
       end
     end
 
+    context 'when response body is in an encoding Ruby has no converter for' do
+      # Input: a body tagged UTF-7 (a dummy encoding), as a charset=utf-7
+      # response can yield, ending in a high byte that is not valid UTF-8.
+      let(:response_body) { "+AOk-\xFF".b.force_encoding(Encoding::UTF_7) }
+
+      it 'logs the body bytes as scrubbed UTF-8' do
+        expect(logger).to have_received(:info) do |message|
+          expect(message.encoding).to eq(Encoding::UTF_8)
+          expect(message).to be_valid_encoding
+          expect(message).to include("+AOk-\uFFFD")
+        end
+      end
+    end
+
     it "formats a response in a style that resembles a -v curl" do
       logger_double = double
       expect(logger_double).to receive(:info).with(
