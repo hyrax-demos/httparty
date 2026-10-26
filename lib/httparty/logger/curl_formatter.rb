@@ -82,7 +82,22 @@ module HTTParty
       end
 
       def log(direction, line = '')
-        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{line}"
+        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{utf8_safe(line)}"
+      end
+
+      # Returns +str+ as valid UTF-8 so that lines carrying binary bodies can be
+      # joined with UTF-8 lines. Invalid or unconvertible bytes become U+FFFD.
+      # The caller's string is never modified.
+      def utf8_safe(str)
+        str = str.to_s
+
+        if str.encoding == Encoding::ASCII_8BIT
+          str.dup.force_encoding(Encoding::UTF_8).scrub
+        elsif str.encoding == Encoding::UTF_8
+          str.valid_encoding? ? str : str.scrub
+        else
+          str.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+        end
       end
 
       def current_time
