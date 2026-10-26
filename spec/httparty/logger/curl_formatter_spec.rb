@@ -219,4 +219,56 @@ RSpec.describe HTTParty::Logger::CurlFormatter do
       expect(logged).to include("name: caf\u00e9")
     end
   end
+
+  describe "#format with encodings Ruby cannot convert to UTF-8" do
+    let(:logger_double)   { double('Logger') }
+    let(:response_object) { Net::HTTPOK.new('1.1', 200, 'OK') }
+    let(:parsed_response) { lambda { {"foo" => "bar"} } }
+
+    subject { described_class.new(logger_double, :info) }
+
+    it "logs a response body relabelled UTF-7 by its charset as valid UTF-8" do
+      # Input: a response with Content-Type charset=utf-7, performed with
+      # log_format: :curl so Request#perform relabels the body as the dummy
+      # UTF-7 encoding, which has no converter to UTF-8. The body holds the
+      # UTF-7 spelling of "café" and one high byte. Bytes are built at run
+      # time rather than stored as a fixture file.
+      logged = nil
+      allow(logger_double).to receive(:info) { |message| logged = message }
+      @request = HTTParty::Request.new(
+        Net::HTTP::Get, 'http://foo.bar.com/', logger: logger_double, log_format: :curl
+      )
+      stubbed = stub_response "caf+AOk- \xFF".b
+      stubbed.initialize_http_header("Content-Type" => "text/plain;charset=utf-7")
+
+      resp = nil
+      expect { resp = @request.perform }.not_to raise_error
+      expect(resp.body.encoding).to eq(Encoding::UTF_7)
+      expect(logged.encoding).to eq(Encoding::UTF_8)
+      expect(logged).to be_valid_encoding
+      expect(logged).to include("caf+AOk- \uFFFD")
+    end
+
+    it "logs an Emacs-Mule query value with non-ASCII bytes as valid UTF-8" do
+      # Input: a request whose query hash has a value labelled Emacs-Mule
+      # that holds non-ASCII bytes; Ruby has no Emacs-Mule to UTF-8
+      # converter. Bytes are built at run time rather than stored as a
+      # fixture file.
+      value = "caf\x81\xE9".b.force_encoding(Encoding.find('Emacs-Mule'))
+      request = HTTParty::Request.new(
+        Net::HTTP::Get, 'http://foo.bar.com/', query: { name: value }
+      )
+      allow(request).to receive(:raw_body).and_return(nil)
+      response = HTTParty::Response.new(request, response_object, parsed_response, body: "ok")
+
+      logged = nil
+      allow(logger_double).to receive(:info) { |message| logged = message }
+
+      expect { subject.format(request, response) }.not_to raise_error
+      expect(logged.encoding).to eq(Encoding::UTF_8)
+      expect(logged).to be_valid_encoding
+      expect(logged).to include("name: caf\uFFFD")
+      expect(value.encoding).to eq(Encoding.find('Emacs-Mule'))
+    end
+  end
 end

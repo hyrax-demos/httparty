@@ -96,7 +96,11 @@ module HTTParty
         elsif str.encoding == Encoding::UTF_8
           str.valid_encoding? ? str : str.scrub
         else
-          str.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+          begin
+            str.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+          rescue Encoding::ConverterNotFoundError
+            str.dup.force_encoding(Encoding::UTF_8).scrub
+          end
         end
       end
 
