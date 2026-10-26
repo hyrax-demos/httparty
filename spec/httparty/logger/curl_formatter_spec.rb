@@ -115,5 +115,44 @@ RSpec.describe HTTParty::Logger::CurlFormatter do
       response = HTTParty::Request.new.perform
       subject.format(response.request, response)
     end
+
+    context 'when the response body is binary' do
+      let(:logger_double)        { double('Logger') }
+      let(:binary_request)       { HTTParty::Request.new(Net::HTTP::Get, 'http://foo.bar.com/') }
+      let(:binary_response_obj)  { Net::HTTPOK.new('1.1', 200, 'OK') }
+      let(:binary_response)      { HTTParty::Response.new(binary_request, binary_response_obj, parsed_response) }
+
+      def format_with(raw_body:, body:)
+        allow(binary_request).to receive(:raw_body).and_return(raw_body)
+        allow(binary_response_obj).to receive_messages(body: body)
+        binary_response_obj['header-key'] = 'header-value'
+
+        described_class.new(logger_double, :info).format(binary_request, binary_response)
+      end
+
+      # Input: a non-ASCII UTF-8 request body logged together with an
+      # ASCII-8BIT response body holding bytes that are not valid UTF-8.
+      it 'does not raise when the response body is binary and another line is non-ASCII UTF-8' do
+        logged = nil
+        expect(logger_double).to receive(:info) { |message| logged = message }
+
+        format_with(raw_body: "name=J\u00f6hn", body: "\xFF\xD8\xFF\xE0".b)
+
+        expect(logged).to be_valid_encoding
+        expect(logged).to include("J\u00f6hn")
+        expect(logged).to include("\uFFFD")
+      end
+
+      # Input: an ASCII-8BIT response body whose bytes are valid UTF-8 text.
+      it 'logs a binary-tagged body holding valid UTF-8 bytes as readable text' do
+        logged = nil
+        expect(logger_double).to receive(:info) { |message| logged = message }
+
+        format_with(raw_body: 'content', body: "caf\u00e9".b)
+
+        expect(logged).to be_valid_encoding
+        expect(logged).to include("caf\u00e9")
+      end
+    end
   end
 end
