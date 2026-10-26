@@ -15,6 +15,7 @@ module HTTParty
     #     }
     #   }.to_params
     #     #=> "name=Bob&address[city]=Ruby Central&address[phones][]=111-111-1111&address[phones][]=222-222-2222&address[street]=111 Ruby Ave."
+    # @example to_params({ filters: { tags: [] } }) #=> "filters%5Btags%5D%5B%5D="
     def self.to_params(hash)
       hash.to_hash.map { |k, v| normalize_param(k, v) }.join.chop
     end
@@ -56,8 +57,13 @@ module HTTParty
           if child_value.respond_to?(:to_hash)
             stack << ["#{parent}[#{child_key}]", child_value.to_hash]
           elsif child_value.respond_to?(:to_ary)
-            child_value.to_ary.each do |v|
-              normalized_keys << normalize_keys("#{parent}[#{child_key}][]", v).flatten
+            child_array = child_value.to_ary
+            if child_array.empty?
+              normalized_keys << normalize_keys("#{parent}[#{child_key}]", []).flatten
+            else
+              child_array.each do |v|
+                normalized_keys << normalize_keys("#{parent}[#{child_key}][]", v).flatten
+              end
             end
           else
             normalized_keys << normalize_keys("#{parent}[#{child_key}]", child_value).flatten
