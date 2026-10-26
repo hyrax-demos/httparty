@@ -41,7 +41,7 @@ module HTTParty
       def log_response
         log IN, "HTTP/#{response.http_version} #{response.code}"
         log_response_headers
-        log IN, "\n#{response.body}"
+        log IN, "\n#{utf8_safe(response.body)}"
         log IN
       end
 
@@ -78,7 +78,7 @@ module HTTParty
       end
 
       def log_hash(hash)
-        hash.each { |k, v| log(OUT, "#{k}: #{v}") }
+        hash.each { |k, v| log(OUT, "#{utf8_safe(k)}: #{utf8_safe(v)}") }
       end
 
       def log(direction, line = '')

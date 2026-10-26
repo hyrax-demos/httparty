@@ -172,4 +172,51 @@ RSpec.describe HTTParty::Logger::CurlFormatter do
       expect(raw_body.encoding).to eq(Encoding::ASCII_8BIT)
     end
   end
+
+  describe "#format with UTF-16 strings" do
+    let(:logger_double)   { double('Logger') }
+    let(:response_object) { Net::HTTPOK.new('1.1', 200, 'OK') }
+    let(:parsed_response) { lambda { {"foo" => "bar"} } }
+
+    subject { described_class.new(logger_double, :info) }
+
+    it "logs a response body relabelled UTF-16LE by its charset as valid UTF-8" do
+      # Input: a response with Content-Type charset=utf-16 and a body of
+      # UTF-16LE bytes (with a little endian BOM) spelling "café", performed
+      # with log_format: :curl so Request#perform relabels the body before
+      # the formatter logs it. Bytes are built at run time rather than stored
+      # as a fixture file.
+      logged = nil
+      allow(logger_double).to receive(:info) { |message| logged = message }
+      @request = HTTParty::Request.new(
+        Net::HTTP::Get, 'http://foo.bar.com/', logger: logger_double, log_format: :curl
+      )
+      stubbed = stub_response "\xFF\xFEc\x00a\x00f\x00\xE9\x00".b
+      stubbed.initialize_http_header("Content-Type" => "text/plain;charset=utf-16")
+
+      resp = nil
+      expect { resp = @request.perform }.not_to raise_error
+      expect(resp.body.encoding).to eq(Encoding::UTF_16LE)
+      expect(logged.encoding).to eq(Encoding::UTF_8)
+      expect(logged).to be_valid_encoding
+      expect(logged).to include("caf\u00e9")
+    end
+
+    it "logs a UTF-16LE query value as valid UTF-8" do
+      # Input: a request whose query hash has a value encoded as UTF-16LE.
+      request = HTTParty::Request.new(
+        Net::HTTP::Get, 'http://foo.bar.com/', query: { name: "caf\u00e9".encode(Encoding::UTF_16LE) }
+      )
+      allow(request).to receive(:raw_body).and_return(nil)
+      response = HTTParty::Response.new(request, response_object, parsed_response, body: "ok")
+
+      logged = nil
+      allow(logger_double).to receive(:info) { |message| logged = message }
+
+      expect { subject.format(request, response) }.not_to raise_error
+      expect(logged.encoding).to eq(Encoding::UTF_8)
+      expect(logged).to be_valid_encoding
+      expect(logged).to include("name: caf\u00e9")
+    end
+  end
 end
