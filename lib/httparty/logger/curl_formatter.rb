@@ -71,8 +71,12 @@ module HTTParty
       end
 
       def log_response_headers
+        # Iterate the headers object rather than calling each_header on an
+        # HTTParty::Response: that goes through method_missing, which parses
+        # the body first, so logging would raise for a body the parser
+        # cannot handle.
         headers = response.respond_to?(:headers) ? response.headers : response
-        response.each_header do |response_header|
+        headers.each_header do |response_header|
           log IN, "#{response_header.capitalize}: #{headers[response_header]}"
         end
       end
