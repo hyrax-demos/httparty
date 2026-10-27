@@ -157,6 +157,15 @@ RSpec.describe HTTParty::Response do
           end
         end
       end
+
+      context 'when the response body is UTF-16' do
+        # Input: a body in an encoding that is not ASCII-compatible.
+        let(:body) { "Not Found caf\u00e9".encode(Encoding::UTF_16LE) }
+
+        it 'throws ResponseError with the body converted to UTF-8' do
+          expect{ subject }.to raise_error(HTTParty::ResponseError, "Code 404 - Not Found caf\u00e9")
+        end
+      end
     end
   end
 

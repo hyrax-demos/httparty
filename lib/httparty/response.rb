@@ -139,11 +139,21 @@ module HTTParty
       matchers = raise_on.is_a?(Range) ? [raise_on] : [*raise_on]
 
       if matchers.any? { |matcher| code_matches?(matcher) }
-        ::Kernel.raise ::HTTParty::ResponseError.new(@response), "Code #{code} - #{body}"
+        ::Kernel.raise ::HTTParty::ResponseError.new(@response), "Code #{code} - #{exception_message_body}"
       end
     end
 
     private
+
+    # A body in an encoding that is not ASCII-compatible, such as UTF-16,
+    # cannot be interpolated into the message. Convert it to UTF-8,
+    # replacing bytes that are not valid in it.
+    def exception_message_body
+      text = body.to_s
+      return text if text.encoding.ascii_compatible?
+
+      text.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+    end
 
     def code_matches?(matcher)
       case matcher
