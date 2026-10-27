@@ -88,7 +88,7 @@ module HTTParty
       # Binary bodies are reinterpreted as UTF-8 and scrubbed so the join in `format` cannot raise Encoding::CompatibilityError.
       def utf8_safe(str)
         str = str.to_s
-        return str if str.encoding == Encoding::UTF_8 && str.valid_encoding?
+        return str.scrub if str.encoding == Encoding::UTF_8
         return str.dup.force_encoding(Encoding::UTF_8).scrub if str.encoding == Encoding::BINARY
 
         str.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
