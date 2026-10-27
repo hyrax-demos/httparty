@@ -116,4 +116,43 @@ RSpec.describe HTTParty::Logger::CurlFormatter do
       subject.format(response.request, response)
     end
   end
+
+  describe "#format with a binary response body" do
+    let(:logger)          { double('Logger') }
+    let(:response_object) { Net::HTTPOK.new('1.1', 200, 'OK') }
+    let(:parsed_response) { lambda { {"foo" => "bar"} } }
+
+    let(:response) do
+      HTTParty::Response.new(request, response_object, parsed_response)
+    end
+
+    let(:request) do
+      HTTParty::Request.new(Net::HTTP::Get, 'http://foo.bar.com/')
+    end
+
+    subject { described_class.new(logger, :info) }
+
+    # Kept outside the "#format" describe so its before block, which calls
+    # format with an ASCII-only body, does not run first.
+    # The input is a body of high bytes (ASCII-8BIT, as a JPEG header) logged
+    # together with a request body that holds a non-ASCII UTF-8 character.
+    before do
+      allow(logger).to receive(:info)
+      allow(request).to receive(:raw_body).and_return('café')
+      allow(response_object).to receive_messages(body: "\xFF\xD8\xFF\xE0".b)
+      response_object['header-key'] = 'header-value'
+    end
+
+    it 'logs a valid UTF-8 message without raising' do
+      expect { subject.format request, response }.not_to raise_error
+
+      expect(logger).to have_received(:info).with(
+        satisfy { |message|
+          message.include?('café') &&
+            message.encoding == Encoding::UTF_8 &&
+            message.valid_encoding?
+        }
+      )
+    end
+  end
 end

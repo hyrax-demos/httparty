@@ -82,7 +82,18 @@ module HTTParty
       end
 
       def log(direction, line = '')
-        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{line}"
+        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{utf8_safe(line.to_s)}"
+      end
+
+      # A binary (ASCII-8BIT) body joined with non-ASCII UTF-8 lines raised Encoding::CompatibilityError.
+      def utf8_safe(str)
+        if str.encoding == Encoding::ASCII_8BIT
+          str.dup.force_encoding(Encoding::UTF_8).scrub
+        elsif str.encoding != Encoding::UTF_8
+          str.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+        else
+          str.scrub
+        end
       end
 
       def current_time
