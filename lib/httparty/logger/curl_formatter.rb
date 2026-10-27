@@ -41,7 +41,7 @@ module HTTParty
       def log_response
         log IN, "HTTP/#{response.http_version} #{response.code}"
         log_response_headers
-        log IN, "\n#{response.body}"
+        log IN, "\n#{utf8_safe(response.body)}"
         log IN
       end
 
@@ -82,7 +82,16 @@ module HTTParty
       end
 
       def log(direction, line = '')
-        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{line}"
+        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{utf8_safe(line)}"
+      end
+
+      # Binary bodies are reinterpreted as UTF-8 and scrubbed so the join in `format` cannot raise Encoding::CompatibilityError.
+      def utf8_safe(str)
+        str = str.to_s
+        return str.scrub if str.encoding == Encoding::UTF_8
+        return str.dup.force_encoding(Encoding::UTF_8).scrub if str.encoding == Encoding::BINARY
+
+        str.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
       end
 
       def current_time
