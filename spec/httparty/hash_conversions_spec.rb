@@ -19,6 +19,18 @@ RSpec.describe HTTParty::HashConversions do
         hash = { marketing_event: { marketed_resources: [ {type:"product", id: 57474842640 } ] } }
         expect(HTTParty::HashConversions.to_params(hash)).to eq("marketing_event%5Bmarketed_resources%5D%5B%5D%5Btype%5D=product&marketing_event%5Bmarketed_resources%5D%5B%5D%5Bid%5D=57474842640")
       end
+
+      # Input: an empty array one level inside a hash.
+      it 'keeps an empty array nested in a hash' do
+        hash = { filters: { tags: [] } }
+        expect(HTTParty::HashConversions.to_params(hash)).to eq("filters%5Btags%5D%5B%5D=")
+      end
+
+      # Input: an empty array two hash levels deep.
+      it 'keeps an empty array nested several hashes deep' do
+        hash = { a: { b: { c: [] } } }
+        expect(HTTParty::HashConversions.to_params(hash)).to eq("a%5Bb%5D%5Bc%5D%5B%5D=")
+      end
     end
   end
 
