@@ -39,6 +39,22 @@ RSpec.describe HTTParty::HashConversions do
       end
     end
 
+    context "value is a hash holding an empty array" do
+      # Input: an empty array one hash below the top-level key.
+      it "keeps the empty array's key with an empty value" do
+        expect(
+          HTTParty::HashConversions.to_params(filters: { tags: [] })
+        ).to eq("filters%5Btags%5D%5B%5D=")
+      end
+
+      # Input: an empty array two hashes below the top-level key, next to a sibling value.
+      it "keeps the empty array's key when it is nested two hashes deep" do
+        expect(
+          HTTParty::HashConversions.normalize_param(:search, { filters: { tags: [], q: "x" } })
+        ).to eq("search%5Bfilters%5D%5Btags%5D%5B%5D=&search%5Bfilters%5D%5Bq%5D=x&")
+      end
+    end
+
     context "value is hash" do
       it "creates a params string" do
         expect(
