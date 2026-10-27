@@ -115,5 +115,33 @@ RSpec.describe HTTParty::Logger::CurlFormatter do
       response = HTTParty::Request.new.perform
       subject.format(response.request, response)
     end
+
+    it "logs a binary (ASCII-8BIT) response body alongside UTF-8 log lines without raising" do
+      # Input: a request header whose value is non-ASCII UTF-8, paired with an
+      # ASCII-8BIT response body that holds invalid bytes (\xFF\xD8) followed by
+      # the valid UTF-8 bytes of "caf\u00E9". Joining those two lines raised before.
+      logger_double = double('Logger')
+      logged = nil
+      allow(logger_double).to receive(:info) { |message| logged = message }
+
+      binary_request = HTTParty::Request.new(
+        Net::HTTP::Get, 'http://foo.bar.com/', headers: { 'x-note' => "caf\u00E9" }
+      )
+      allow(binary_request).to receive(:raw_body).and_return(nil)
+      binary_response_object = Net::HTTPOK.new('1.1', 200, 'OK')
+      binary_body = "\xFF\xD8 ok caf\xC3\xA9".b
+      binary_response = HTTParty::Response.new(
+        binary_request, binary_response_object, parsed_response, body: binary_body
+      )
+
+      formatter = described_class.new(logger_double, :info)
+
+      expect { formatter.format(binary_request, binary_response) }.not_to raise_error
+      expect(logged.encoding).to eq(Encoding::UTF_8)
+      expect(logged).to be_valid_encoding
+      expect(logged).to include("> x-note: caf\u00E9")
+      expect(logged).to include("ok caf\u00E9")
+      expect(logged).to include("\uFFFD")
+    end
   end
 end
