@@ -20,6 +20,23 @@ RSpec.describe HTTParty::HashConversions do
         expect(HTTParty::HashConversions.to_params(hash)).to eq("marketing_event%5Bmarketed_resources%5D%5B%5D%5Btype%5D=product&marketing_event%5Bmarketed_resources%5D%5B%5D%5Bid%5D=57474842640")
       end
     end
+
+    context "empty array nested in a hash" do
+      # Input: an empty array one hash level below the top-level key.
+      it "keeps the key with an empty value" do
+        expect(HTTParty::HashConversions.to_params({filters: {tags: []}})).to eq("filters%5Btags%5D%5B%5D=")
+      end
+
+      # Input: an empty array two hash levels below the top-level key.
+      it "keeps the key with an empty value when nested deeper" do
+        expect(HTTParty::HashConversions.to_params({a: {b: {c: []}}})).to eq("a%5Bb%5D%5Bc%5D%5B%5D=")
+      end
+
+      # Input: an empty array next to a scalar sibling in the same hash.
+      it "keeps the key alongside its siblings in key order" do
+        expect(HTTParty::HashConversions.to_params({filters: {tags: [], name: "x"}})).to eq("filters%5Btags%5D%5B%5D=&filters%5Bname%5D=x")
+      end
+    end
   end
 
   describe ".normalize_param" do
