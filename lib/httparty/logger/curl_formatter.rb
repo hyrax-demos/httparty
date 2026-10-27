@@ -41,7 +41,7 @@ module HTTParty
       def log_response
         log IN, "HTTP/#{response.http_version} #{response.code}"
         log_response_headers
-        log IN, "\n#{response.body}"
+        log IN, "\n#{utf8(response.body)}"
         log IN
       end
 
@@ -82,7 +82,16 @@ module HTTParty
       end
 
       def log(direction, line = '')
-        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{line}"
+        messages << "[#{TAG_NAME}] [#{current_time}] #{direction} #{utf8(line)}"
+      end
+
+      # A body can be binary (ASCII-8BIT) or in an encoding such as UTF-16,
+      # which cannot always be joined with UTF-8 lines. Convert to UTF-8,
+      # replacing bytes that are not valid in it.
+      def utf8(text)
+        text = text.to_s
+        text = text.dup.force_encoding(Encoding::UTF_8) if text.encoding == Encoding::BINARY
+        text.encode(Encoding::UTF_8, invalid: :replace, undef: :replace).scrub
       end
 
       def current_time
