@@ -39,5 +39,41 @@ RSpec.describe HTTParty::Logger do
       expect{ HTTParty::Logger.add_formatter(:custom2, CustomFormatter2) }.
         to raise_error HTTParty::Error
     end
+
+    it "raises error and keeps the built-in when the String 'curl' is added" do
+      # Input: the String form of the built-in :curl name.
+      original = HTTParty::Logger.formatters[:curl]
+      custom = Class.new(HTTParty::Logger::CurlFormatter)
+      begin
+        expect { HTTParty::Logger.add_formatter('curl', custom) }.
+          to raise_error HTTParty::Error
+        expect(HTTParty::Logger.formatters[:curl]).to eq(HTTParty::Logger::CurlFormatter)
+      ensure
+        HTTParty::Logger.formatters[:curl] = original
+      end
+    end
+
+    it "raises error when the same String name is added twice" do
+      formatter = Class.new(HTTParty::Logger::CurlFormatter)
+      HTTParty::Logger.add_formatter('string_dup_formatter_spec', formatter)
+
+      expect { HTTParty::Logger.add_formatter('string_dup_formatter_spec', formatter) }.
+        to raise_error HTTParty::Error
+    end
+
+    it "raises error when a String name matches a registered Symbol" do
+      formatter = Class.new(HTTParty::Logger::CurlFormatter)
+      HTTParty::Logger.add_formatter(:symbol_then_string_formatter_spec, formatter)
+
+      expect { HTTParty::Logger.add_formatter('symbol_then_string_formatter_spec', formatter) }.
+        to raise_error HTTParty::Error
+    end
+
+    it "stores a String name under its Symbol key" do
+      formatter = Class.new(HTTParty::Logger::CurlFormatter)
+      HTTParty::Logger.add_formatter('string_stored_as_symbol_formatter_spec', formatter)
+
+      expect(HTTParty::Logger.formatters[:string_stored_as_symbol_formatter_spec]).to eq(formatter)
+    end
   end
 end
